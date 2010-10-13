@@ -29,7 +29,7 @@ lastChan = firstChan + chanCount - 1;
 
 for freqOffset = 1:length(freqList)
     for ampOffset = 1:length(ampList)
-        disp(['Frequency ', num2str(freqList(freqOffset)), ' (', num2str(freqOffset), ' of ' , num2str(length(freqList)), '), Amplitude ', num2str(ampList(ampOffset)), ' (', num2str(ampOffsset), ' of ' , num2str(length(ampList)), ')']);
+        disp(['Frequency ', num2str(freqList(freqOffset)), ' (', num2str(freqOffset), ' of ' , num2str(length(freqList)), '), Amplitude ', num2str(ampList(ampOffset)), ' (', num2str(ampOffset), ' of ' , num2str(length(ampList)), ')']);
         TT.ResetFilters
         TT.SetFilterWithDescEx([freqEpocName, ' = ', num2str(freqList(freqOffset)), ' and ', ampEpocName, ' = ', num2str(ampList(ampOffset))]);
         TT.SetEpocTimeFilterV(sweepEpocName, 0, 0.05);
