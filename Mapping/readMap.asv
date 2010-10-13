@@ -1,0 +1,44 @@
+chanCount = 32;
+firstChan = 1;
+spikeEpocName = 'CSPK';
+freqEpocName = 'Frq1';
+ampEpocName = 'Lev1';
+sweepEpocName = 'Swep';
+
+%TT = actxserver('TTank.X');
+%TT.ConnectServer('Local','Me');
+%TT.OpenTank('C:\Simeon\112_1024\2009-08-31 Mapping 2 with correct calibration\2009-08-31 112_1024 Map1','R');
+%TT.SelectBlock('Map 1');
+%TT.CreateEpocIndexing;
+
+TT.ResetFilters
+
+freqEpocs = TT.GetEpocsV(freqEpocName,0,0,10000);
+freqList = sort(unique(freqEpocs(1,:)));
+ampEpocs = TT.GetEpocsV(ampEpocName,0,0,10000);
+ampList = sort(unique(ampEpocs(1,:)));
+%repCount = length(freqEpocs(1,:)) / length(freqList) / length(ampList);
+spikeMeans = zeros(length(freqList), length(ampList), chanCount);
+spikeSDs = zeros(length(freqList), length(ampList), chanCount);
+lastChan = firstChan + chanCount - 1;
+
+for freqOffset = 1:length(freqList)
+    disp([num2str(freqList(freqOffset)), ' of ', num2str(freqList(length(freqList)))]);
+    for ampOffset = 1:length(ampList)
+        TT.ResetFilters
+        TT.SetFilterWithDescEx([freqEpocName, ' = ', num2str(freqList(freqOffset)), ' and ', ampEpocName, ' = ', num2str(ampList(ampOffset))]);
+        TT.SetEpocTimeFilterV(sweepEpocName, 0, 0.05);
+        clear repEpocs;
+        repEpocs = TT.GetValidTimeRangesV;
+        TT.ResetFilters;
+        
+        for chan = firstChan:lastChan
+            thisStimSpikeCounts = zeros(0,length(repEpocs(1,:)));
+            for repNum = 1:length(repEpocs(1,:));
+                thisStimSpikeCounts(repNum)= TT.ReadEventsV(100000, spikeEpocName, chan, 0, repEpocs(1,repNum), repEpocs(2,repNum), 'JUSTTIMES');
+            end
+            spikeMeans(freqOffset, ampOffset, (chan - firstChan + 1)) = mean(thisStimSpikeCounts);
+            spikeSDs(freqOffset, ampOffset, (chan - firstChan + 1)) = std(thisStimSpikeCounts);
+        end        
+    end
+end
