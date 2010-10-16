@@ -1,12 +1,15 @@
-tankName = 'C:\Simeon\112_1024\2009-08-31 Mapping 2 with correct calibration\2009-08-31 112_1024 Map1';
-blockName = 'Map 1'
+tankName = 'L:\Research Data\Simeon Morgan\New\New\104_76\20101012 Map before first stim session\20101012 SM 104_76 map';
+blockName = 'Block-2'
+
+ignorePreStimDuration = 0.0
+stimDuration = 0.05;
 
 chanCount = 32;
 firstChan = 1;
-spikeEpocName = 'CSPK';
-freqEpocName = 'Frq1';
-ampEpocName = 'Lev1';
-sweepEpocName = 'Swep';
+spikeEpocName = 'SS08';
+freqEpocName = 'Freq';
+ampEpocName = 'Amp_';
+sweepEpocName = 'SweS';
 
 TT = actxserver('TTank.X');
 TT.ConnectServer('Local','Me');
@@ -32,7 +35,7 @@ for freqOffset = 1:length(freqList)
         disp(['Frequency ', num2str(freqList(freqOffset)), ' (', num2str(freqOffset), ' of ' , num2str(length(freqList)), '), Amplitude ', num2str(ampList(ampOffset)), ' (', num2str(ampOffset), ' of ' , num2str(length(ampList)), ')']);
         TT.ResetFilters
         TT.SetFilterWithDescEx([freqEpocName, ' = ', num2str(freqList(freqOffset)), ' and ', ampEpocName, ' = ', num2str(ampList(ampOffset))]);
-        TT.SetEpocTimeFilterV(sweepEpocName, 0, 0.05);
+        TT.SetEpocTimeFilterV(sweepEpocName, ignorePreStimDuration, stimDuration);
         clear repEpocs;
         repEpocs = TT.GetValidTimeRangesV;
         TT.ResetFilters;

@@ -1,0 +1,77 @@
+swepNum = 31;
+preSpikeWindowPlot = 5;
+postSpikeWindowPlot = 25;
+
+preSnipWindowPlot = 24;
+postSnipWindowPlot = 24;
+
+windowsToPlot = zeros(preSpikeWindowPlot + postSpikeWindowPlot  + 1, length(thisStimSpikeTimes{swepNum}));
+
+thisStimSpikeTimesSingle = thisStimSpikeTimes{swepNum};
+
+for t_spikeNum = 1:length(thisStimSpikeTimesSingle)
+    windowsToPlot(:,t_spikeNum) = streamsForSpikeDetect(round(thisStimSpikeTimesSingle(t_spikeNum) * 24414.06)-preSpikeWindowPlot:round(thisStimSpikeTimesSingle(t_spikeNum) * 24414.06) + postSpikeWindowPlot,swepNum);
+end
+
+thisStimSnipTimesOffsetSingle = thisStimSnipTimes{swepNum} - swepEpocs(2,swepNum);
+
+set(0,'DefaultAxesColorOrder',[1 0 0;0 1 0;0 0 1],...
+      'DefaultAxesLineStyleOrder','-|--|:');
+%figure;hist(thisStimSpikeTimes{swepNum},100);
+%histStimSpikeTimes = ans;
+%title('Plot of offline-detected spike times');
+%figure;hist(thisStimSnipTimesOffsetSingle,100);
+%histStimSnipTimes = ans;
+%title('Plot of online-detected spike times');
+
+%figure;plotWindowsToPlot = plot(windowsToPlot);
+%title('Plot of offline-detected spikes');
+%figure;plotStimSnipData = plot(thisStimSnipData{swepNum});
+%title('Plot of online-detected spikes');
+
+%c = [setdiff(thisStimSpikeTimes{swepNum}, thisStimSnipTimesOffset), setdiff(thisStimSnipTimesOffset, thisStimSpikeTimes{swepNum})]
+
+%thisStimSpikeTimes{swepNum}(1) - thisStimSnipTimesOffset(1)
+
+snipsToPlot = zeros(preSnipWindowPlot + postSnipWindowPlot  + 1, length(thisStimSnipTimesOffsetSingle));
+
+for t_snipNum = 1:length(thisStimSnipTimesOffsetSingle)
+    snipsToPlot(:,t_snipNum) = streamsForSpikeDetect(round(thisStimSnipTimesOffsetSingle(t_snipNum) * 24414.06) - preSnipWindowPlot:round(thisStimSnipTimesOffsetSingle(t_snipNum) * 24414.06) + postSnipWindowPlot,swepNum);
+end
+
+%figure;plotStimSnipDataWindowed = plot(snipsToPlot);
+%title('Plot of online-detected spikes from stream');
+spikeToPlot = 1;
+figure;plotWindowsToPlot = plot(windowsToPlot(:,spikeToPlot));
+title('Plot of offline-detected spikes');
+figure;plotStimSnipData = plot(thisStimSnipData{swepNum}(:,spikeToPlot));
+title('Plot of online-detected spikes');
+figure;plotStimSnipDataWindowed = plot(snipsToPlot(:,spikeToPlot));
+title('Plot of online-detected spikes from stream');
+
+disp(' ');
+disp('Compare snip capture times and stream times');
+snipLength = length(thisStimSnipData{swepNum}(:,spikeToPlot));
+snipMatchPlots = zeros(snipLength, length(thisStimSnipTimesOffsetSingle));
+for spikeToPlot = 1:length(thisStimSnipTimesOffsetSingle)
+    for offset = 1:length(streamsForSpikeDetect(:,swepNum)) - snipLength
+        if streamsForSpikeDetect(offset:offset+snipLength-1,swepNum) == thisStimSnipData{swepNum}(:,spikeToPlot);
+            disp(['Spike ', num2str(spikeToPlot), ' matched at time ', num2str(offset/24414.06), ': recorded spike time was ', num2str(thisStimSnipTimesOffsetSingle(spikeToPlot)), ': difference ', num2str(((offset)/24414.06)-thisStimSnipTimesOffsetSingle(spikeToPlot))]);
+            snipMatchPlots(:, spikeToPlot) = streamsForSpikeDetect(offset:offset+29,swepNum);
+        end
+    end
+end
+
+disp(' ');
+disp('Compare snip detect times and stream spike detect times');
+snipLength = length(thisStimSnipData{swepNum}(:,spikeToPlot));
+for spikeToPlot = 1:length(thisStimSnipTimesOffsetSingle)
+	disp(['Snip ', num2str(spikeToPlot), ' occurred at time ', num2str(thisStimSnipTimesOffsetSingle(spikeToPlot))]);
+end
+disp(' ');
+for spikeToPlot = 1:length(thisStimSpikeTimesSingle)
+	disp(['Spike ', num2str(spikeToPlot), ' occurred at time ', num2str(thisStimSpikeTimesSingle(spikeToPlot))]);
+end
+
+figure;plot(snipMatchPlots);
+title('Plot of online-detected spikes matched to the stream');
