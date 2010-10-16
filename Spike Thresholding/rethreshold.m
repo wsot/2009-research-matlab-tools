@@ -2,7 +2,7 @@ tankName = 'K:\Alex Harris\Electrode Test 1\AP 2010-08-18';
 blockName = 'Block-26'
 
 spikeThreshold = 4.2;
-minSamplesBeforeNextDetect = 8;
+minSamplesBeforeNextDetect = 32;
 
 %readOverRequiredLengthSamples means that additional stream data will be
 %collected over what is required, so that snippets can be processed that
@@ -94,7 +94,8 @@ for chan = firstChan:lastChan
             thisStimSnipTimes(repNum) = {TT.ParseEvInfoV(0,thisStimSnip(repNum),6)};
             thisStimSnipData(repNum) = {TT.ParseEvV(0,thisStimSnip(repNum))};
         end
-        if spikeCrossingDirection > -1 %only run positive crossings if they should be included
+        if spikeCrossingDirection == 1 %only run positive crossings if they should be included
+            lastSpikeSample = minSamplesBeforeNextDetect * -1;
             %one way of detecting spikes...
             thresholdExceed = streamsForSpikeDetect(1:length(streamsForSpikeDetect(:,1))-readOverRequiredLengthSamples,repNum) > rmsValues(repNum, chan - firstChan + 1) * spikeThreshold; %find threshold exceed points
             %thresholdExceed = and(cat(1,thresholdExceed ,[0]), xor(cat(1, thresholdExceed , [0]), cat(1, [1], thresholdExceed )));
@@ -103,15 +104,20 @@ for chan = firstChan:lastChan
 
             thresholdExceedFind = find(thresholdExceed);
             for crossingNum = 1:length(thresholdExceedFind) %find where the threshold crossing occurred
-                if thresholdExceedFind(crossingNum) > 1
-                    if thresholdExceed(thresholdExceedFind(crossingNum) - 1) == 0
-                        thisStimSpikeCounts(repNum) = thisStimSpikeCounts(repNum) + 1;
-                        t_spikeTimes(length(t_spikeTimes) + 1) = thresholdExceedFind(crossingNum)/sampleRate;
+                if thresholdExceedFind(crossingNum) > 1 %if this is the first sample of the block, we can't detect a spike because we don't know if the stream was already above threshold
+                    if thresholdExceed(thresholdExceedFind(crossingNum) - 1) == 0 %check that the previous sample was below threshold (i.e. this is a threshold crossing)
+                        if thresholdExceedFind(crossingNum) > (lastSpikeSample + minSamplesBeforeNextDetect) %check that the last detected spike was outside the minSamplesBeforeNextDetect window - i.e. enough time has passed to capture another spike
+                            thisStimSpikeCounts(repNum) = thisStimSpikeCounts(repNum) + 1;
+                            t_spikeTimes(length(t_spikeTimes) + 1) = thresholdExceedFind(crossingNum)/sampleRate;
+                            lastSpikeSample = thresholdExceedFind(crossingNum);
+                        end
                     end
                 end
             end
         end
-        if spikeCrossingDirection < 1 %only run negative crossings if they should be included
+        
+        if spikeCrossingDirection == -1 %only run negative crossings if they should be included
+            lastSpikeSample = minSamplesBeforeNextDetect * -1;
             %one way of detecting spikes...
             thresholdExceed = streamsForSpikeDetect(1:length(streamsForSpikeDetect(:,1))-readOverRequiredLengthSamples,repNum) < rmsValues(repNum, chan - firstChan + 1) * spikeThreshold * -1; %find threshold exceed points
             %thresholdExceed = and(cat(1,thresholdExceed ,[0]), xor(cat(1, thresholdExceed , [0]), cat(1, [1], thresholdExceed )));
@@ -120,14 +126,42 @@ for chan = firstChan:lastChan
 
             thresholdExceedFind = find(thresholdExceed);
             for crossingNum = 1:length(thresholdExceedFind) %find where the threshold crossing occurred
-                if thresholdExceedFind(crossingNum) > 1
-                    if thresholdExceed(thresholdExceedFind(crossingNum) - 1) == 0
-                        thisStimSpikeCounts(repNum) = thisStimSpikeCounts(repNum) + 1;
-                        t_spikeTimes(length(t_spikeTimes) + 1) = thresholdExceedFind(crossingNum)/sampleRate;
+                if thresholdExceedFind(crossingNum) > 1 %if this is the first sample of the block, we can't detect a spike because we don't know if the stream was already above threshold
+                    if thresholdExceed(thresholdExceedFind(crossingNum) - 1) == 0 %check that the previous sample was below threshold (i.e. this is a threshold crossing)
+                        if thresholdExceedFind(crossingNum) > (lastSpikeSample + minSamplesBeforeNextDetect) %check that the last detected spike was outside the minSamplesBeforeNextDetect window - i.e. enough time has passed to capture another spike
+                            thisStimSpikeCounts(repNum) = thisStimSpikeCounts(repNum) + 1;
+                            t_spikeTimes(length(t_spikeTimes) + 1) = thresholdExceedFind(crossingNum)/sampleRate;
+                            lastSpikeSample = thresholdExceedFind(crossingNum);
+                        end
                     end
                 end
             end
         end
+        
+        if spikeCrossingDirection == 0 %only run positive crossings if they should be included
+            lastSpikeSample = minSamplesBeforeNextDetect * -1;
+            %one way of detecting spikes...
+            thresholdExceed = streamsForSpikeDetect(1:length(streamsForSpikeDetect(:,1))-readOverRequiredLengthSamples,repNum) > rmsValues(repNum, chan - firstChan + 1) * spikeThreshold; %find threshold exceed points
+            thresholdExceed = or(thresholdExceed, streamsForSpikeDetect(1:length(streamsForSpikeDetect(:,1))-readOverRequiredLengthSamples,repNum) < rmsValues(repNum, chan - firstChan + 1) * spikeThreshold * -1);
+            %thresholdExceed = and(cat(1,thresholdExceed ,[0]), xor(cat(1, thresholdExceed , [0]), cat(1, [1], thresholdExceed )));
+            %thisStimSpikeCounts(repNum) = length(find(thresholdExceed (1:length(thresholdExceed ) - 1)));
+            %thisStimSpikeTimes(repNum) = {find(thresholdExceed (1:length(thresholdExceed ) - 1))/sampleRate};
+
+            thresholdExceedFind = find(thresholdExceed);
+            for crossingNum = 1:length(thresholdExceedFind) %find where the threshold crossing occurred
+                if thresholdExceedFind(crossingNum) > 1 %if this is the first sample of the block, we can't detect a spike because we don't know if the stream was already above threshold
+                    if thresholdExceed(thresholdExceedFind(crossingNum) - 1) == 0 %check that the previous sample was below threshold (i.e. this is a threshold crossing)
+                        if thresholdExceedFind(crossingNum) > (lastSpikeSample + minSamplesBeforeNextDetect) %check that the last detected spike was outside the minSamplesBeforeNextDetect window - i.e. enough time has passed to capture another spike
+                            thisStimSpikeCounts(repNum) = thisStimSpikeCounts(repNum) + 1;
+                            t_spikeTimes(length(t_spikeTimes) + 1) = thresholdExceedFind(crossingNum)/sampleRate;
+                            lastSpikeSample = thresholdExceedFind(crossingNum);
+                        end
+                    end
+                end
+            end
+        end
+
+        
         thisStimSpikeTimes(repNum) = {t_spikeTimes};
     end
     spikeNs((chan - firstChan + 1)) = length(repEpocs(1,:));

@@ -25,10 +25,21 @@ freqList = sort(unique(freqEpocs(1,:)));
 ampEpocs = TT.GetEpocsV(ampEpocName,0,0,10000);
 ampList = sort(unique(ampEpocs(1,:)));
 %repCount = length(freqEpocs(1,:)) / length(freqList) / length(ampList);
+lastChan = firstChan + chanCount - 1;
+
+freqList = freqList(1:44);
+ampList = ampList(1:7);
+
+
+clear spikeMeans;
+clear spikeSDs;
+clear spikeNs;
+clear spikeTimes;
+%repCount = length(freqEpocs(1,:)) / length(freqList) / length(ampList);
 spikeMeans = zeros(length(ampList), length(freqList), chanCount);
 spikeSDs = zeros(length(ampList), length(freqList), chanCount);
 spikeNs = zeros(length(ampList), length(freqList), chanCount);
-lastChan = firstChan + chanCount - 1;
+spikeTimes = cell(length(ampList), length(freqList), chanCount);
 
 for freqOffset = 1:length(freqList)
     for ampOffset = 1:length(ampList)
