@@ -1,0 +1,173 @@
+tankName = 'M:\Ben Allitt\BA 20101111 Stim';
+blockName = 'Block-11'
+
+spikeThreshold = 3.7;
+minSamplesBeforeNextDetect = 32;
+
+%readOverRequiredLengthSamples means that additional stream data will be
+%collected over what is required, so that snippets can be processed that
+%overrun the end of the specified period
+readOverRequiredLengthSamples = 32;
+
+%stim duration in seconds - i.e. 0.05 for 50ms
+ignorePreStimDuration = 0.003;
+stimDuration = 0.047;
+%duration used immediately prior to next stim to use for RMS generation (in
+%seconds - i.e. 0.1 = 100ms). The 1ms prior to the next stim will
+%not be used to ensure that the RMS calculation does not run into the
+%beginning of the next stim
+preStimDurationForRMS = 0.15;
+
+%threshold crossing directions to use: -1 = only negative, 1 = only
+%positive, 0 = either direction
+spikeCrossingDirection = 0;
+
+chanCount = 32;
+firstChan = 1; 
+spikeEpocName = 'FS32';
+StimChanEpocName = 'AuBM';
+RefChanEpocName = 'ReBM';
+currEpocName = 'AuCu';
+sweepEpocName = 'AuCu';
+
+%It would be nice to read this directly from the tank, but it appears to be
+%a messy thing to try to do - have to use CurBlockNotes which has an awful
+%format
+sampleRate = 24414.06;
+
+
+%set up a filter
+%A_stop1 = 60;		% Attenuation in the first stopband = 24 dB
+%F_stop1 = 250;		% Edge of the stopband = 150 Hz
+%F_pass1 = 300;  	% Edge of the passband = 300 Hz
+%F_pass2 = 5000;     % Closing edge of the passband = 5000 Hz
+%F_stop2 = 6000;	% Edge of the second stopband = 10000 Hz
+%A_stop2 = 60;		% Attenuation in the second stopband = 24 dB
+%A_pass = 0.1;		% Amount of ripple allowed in the passband = 1 dB
+
+%BandPassSpecObj = ...
+%   fdesign.bandpass('Fst1,Fp1,Fp2,Fst2,Ast1,Ap,Ast2', ...
+%		F_stop1, F_pass1, F_pass2, F_stop2, A_stop1, A_pass, ...
+%		A_stop2, 24414)
+%BandPassFilt = design(BandPassSpecObj, 'butter')
+
+
+TT = actxserver('TTank.X');
+TT.ConnectServer('Local','Me');
+TT.OpenTank(tankName,'R');
+TT.SelectBlock(blockName);
+TT.CreateEpocIndexing;
+
+TT.ResetFilters
+
+stimChanEpocs = TT.GetEpocsV(StimChanEpocName,0,0,10000);
+stimChanList = sort(unique(stimChanEpocs(1,:)));
+
+currEpocs = TT.GetEpocsV(currEpocName,0,0,10000);
+currList = sort(unique(currEpocs(1,:)),'descend');
+
+clear spikeMeans;
+clear spikeSDs;
+clear spikeNs;
+clear spikeTimes;
+%repCount = length(freqEpocs(1,:)) / length(freqList) / length(ampList);
+spikeMeans = zeros(length(stimChanList), length(currList), chanCount);
+spikeSDs = zeros(length(stimChanList), length(currList), chanCount);
+spikeNs = zeros(length(stimChanList), length(currList), chanCount);
+spikeTimes = cell(length(stimChanList), length(currList), chanCount);
+
+lastChan = firstChan + chanCount - 1;
+
+TT.SetGlobalV('RespectOffsetEpoc', 0);
+
+%calculate interstim period
+    swepEpocs = TT.GetEpocsV(sweepEpocName,0,0,2);
+    swepPeriod = swepEpocs(2,2) - swepEpocs(2,1);
+    clear swepEpocs;
+%build map
+
+for stimChanOffset = 1:length(stimChanList)
+    for currOffset = 1:length(currList)
+        disp(['StimChan ', num2str(stimChanList(stimChanOffset)), ' (', num2str(stimChanOffset), ' of ' , num2str(length(stimChanList)), '), Current ', num2str(currList(currOffset)), ' (', num2str(currOffset), ' of ' , num2str(length(currList)), ')']);
+        %disp(['Frequency ', num2str(freqList(freqOffset)), ' (', num2str(freqOffset), ' of ' , num2str(length(freqList)), '), Amplitude ', num2str(ampList(ampOffset)), ' (', num2str(ampOffset), ' of ' , num2str(length(ampList)), ')']);
+
+        TT.ResetFilters
+        TT.SetFilterWithDescEx([StimChanEpocName, ' = ', num2str(stimChanList(stimChanOffset)), ' and ', currEpocName, ' = ', num2str(currList(currOffset))]);
+        TT.SetEpocTimeFilterV(sweepEpocName, ignorePreStimDuration, stimDuration);
+        clear repEpocs;
+        repEpocs = TT.GetValidTimeRangesV;
+        %TT.ResetFilters;
+
+        for chan = firstChan:lastChan
+            thisStimSpikeCounts = zeros(1,length(repEpocs(1,:)));
+            %for repNum = 1:length(repEpocs(1,:))
+            %    streamsForSpikeDetect(:,repNum) = filter(BandPassFilt, streamsForSpikeDetect(:,repNum));
+            %end
+
+            for repNum = 1:length(repEpocs(1,:))
+                thisStimSpikeCounts(repNum)= TT.ReadEventsV(100000, spikeEpocName, chan, 0, repEpocs(1,repNum), repEpocs(2,repNum), 'JUSTTIMES');
+            end
+            spikeNs(stimChanOffset, currOffset, (chan - firstChan + 1)) = length(repEpocs(1,:));
+            spikeMeans(stimChanOffset, currOffset, (chan - firstChan + 1)) = mean(thisStimSpikeCounts);
+            spikeSDs(stimChanOffset, currOffset, (chan - firstChan + 1)) = std(thisStimSpikeCounts);
+            clear thisStimSpikeCounts;
+        end
+        %clear streamsForSpikeDetect;
+        clear repNum;
+        clear streamsForSpikeDetect;
+        clear repEpocs;
+        clear chan;
+    end
+end
+
+%clear tankName;
+%clear blockName;
+clear spikeThreshold;
+clear minSamplesBeforeNextDetect;
+clear stimDuration;
+clear preStimDurationForRMS;
+clear spikeCrossingDirection;
+clear chanCount;
+clear firstChan;
+%clear spikeEpocName;
+clear freqEpocName;
+clear ampEpocName;
+clear sweepEpocName;
+clear sampleRate;
+clear freqEpocs;
+clear ampEpocs;
+clear lastChan;
+clear swepPeriod;
+clear rmsValues;
+
+TT.CloseTank
+TT.ReleaseServer
+
+output = cell((2*20) + 6, 102);
+for stimChanOffset = 1:length(stimChanList)
+        output(((stimChanOffset - 1) * 23) + 1,1) = {['Means: Stim chan = ', num2str(stimChanList(stimChanOffset))]};
+        output(((stimChanOffset - 1) * 23) + 1,35) = {['SDs: Stim chan = ', num2str(stimChanList(stimChanOffset))]};
+        output(((stimChanOffset - 1) * 23) + 1,70) = {['Ns: Stim chan = ', num2str(stimChanList(stimChanOffset))]};
+        for currOffset = 1:20
+            output(((stimChanOffset - 1) * 23) + 2 + currOffset, 1) = {currList(currOffset)};
+            output(((stimChanOffset - 1) * 23) + 2 + currOffset, 35) = {currList(currOffset)};
+            output(((stimChanOffset - 1) * 23) + 2 + currOffset, 70) = {currList(currOffset)};
+        end
+        for chanNum = 1:32
+            output(((stimChanOffset - 1) * 23) + 2, 1 + chanNum) = {chanNum};
+            output(((stimChanOffset - 1) * 23) + 2, 35 + chanNum) = {chanNum};
+            output(((stimChanOffset - 1) * 23) + 2, 70 + chanNum) = {chanNum};
+        end
+
+        for currOffset = 1:20
+            for chanNum = 1:32
+                output(((stimChanOffset - 1) * 23) + 2 + currOffset, 1 + chanNum) = {spikeMeans(stimChanOffset, currOffset, chanNum)};
+                output(((stimChanOffset - 1) * 23) + 2 + currOffset, 35 + chanNum) = {spikeSDs(stimChanOffset, currOffset, chanNum)};
+                output(((stimChanOffset - 1) * 23) + 2 + currOffset, 70 + chanNum) = {spikeNs(stimChanOffset, currOffset, chanNum)};
+            end
+        end
+end
+xlswrite([tankName,'\','MATLAB_',blockName,'_using_',spikeEpocName,'.xls'], output);
+clear tankName;
+clear blockName;
+clear spikeEpocName;
